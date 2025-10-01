@@ -1,0 +1,21 @@
+const DEFAULT_PORT = 3000;
+const DEFAULT_VERIFY_TOKEN = "zalo-verify-token";
+const DEFAULT_ZALO_TOKEN =
+  "3734808841472454698:zxYsWbVcyCKqisEgEqHfpVdHMaoHjJeNuROBNhXJuEMiPHcgWRXdwlRFFiSXAitG";
+const DEFAULT_TURSO_URL = "libsql://muster-teadragon.aws-ap-northeast-1.turso.io";
+const DEFAULT_TURSO_TOKEN =
+  "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTkyNzY0ODIsImlkIjoiMzMxZTgzZjEtZjY3MS00OWI2LTk4OTYtNjY4YTRjZjJlOGViIiwicmlkIjoiNTg0MGM4MmQtZTkzMC00YzU1LTk5NTgtYjc0YThiMzcxYTg3In0.9ZEVsBJB8jM5AflODXgTGJrEH0c9-J8bgvEf2Z0T-tH3eURNXU_w5jnJ7gAdwTYbtyL7vAMnOcRVICS627YcCQ";
+
+const VALID_DAYS = ["t3", "t5", "t7"];
+
+module.exports = {
+  PORT: Number(process.env.PORT || DEFAULT_PORT),
+  VERIFY_TOKEN:
+    process.env.ZALO_VERIFY_TOKEN || process.env.VERIFY_TOKEN || DEFAULT_VERIFY_TOKEN,
+  ZALO_ACCESS_TOKEN: process.env.ZALO_ACCESS_TOKEN || DEFAULT_ZALO_TOKEN,
+  TURSO_DATABASE_URL:
+    process.env.TURSO_DATABASE_URL || process.env.TURSO_URL || DEFAULT_TURSO_URL,
+  TURSO_AUTH_TOKEN:
+    process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN || DEFAULT_TURSO_TOKEN,
+  VALID_DAYS
+};
