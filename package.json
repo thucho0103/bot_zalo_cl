@@ -2,5 +2,23 @@
   "dependencies": {
     "@libsql/client": "^0.11.0",
     "node-zalo-bot": "^0.1.6"
-  }
+  },
+  "name": "zalo_bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "config.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thucho0103/bot_zalo_cl.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/thucho0103/bot_zalo_cl/issues"
+  },
+  "homepage": "https://github.com/thucho0103/bot_zalo_cl#readme"
 }
