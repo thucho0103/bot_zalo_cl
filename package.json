@@ -1,13 +1,13 @@
 {
   "dependencies": {
     "@libsql/client": "^0.11.0",
+    "express": "^4.21.2",
     "node-zalo-bot": "^0.1.6"
   },
   "name": "zalo_bot",
   "version": "1.0.0",
   "description": "",
   "main": "config.js",
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

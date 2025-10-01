@@ -1,78 +1,90 @@
-const http = require("http");
-const { URL } = require("url");
+const express = require("express");
 const ZaloBot = require("node-zalo-bot");
 
 const { PORT, VERIFY_TOKEN, ZALO_ACCESS_TOKEN } = require("./config");
 const { initializeDatabase, closeDatabase } = require("./db");
 const { createMessageHandler } = require("./handlers/messageHandler");
 const { createWebhookProcessor } = require("./webhook/processor");
-const { readRequestBody } = require("./utils/http");
 
 const bot = new ZaloBot(ZALO_ACCESS_TOKEN, { polling: false, webHook: true });
 const { handleMessageText } = createMessageHandler(bot);
 const { handleWebhookPayload } = createWebhookProcessor(handleMessageText);
 
-const server = http.createServer(async (req, res) => {
-  const requestUrl = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
+const app = express();
+app.disable("x-powered-by");
+app.use(
+  express.json({
+    limit: "1mb",
+    type: () => true
+  })
+);
 
-  if (req.method === "GET" && requestUrl.pathname === "/health") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("OK");
-    return;
-  }
-
-  if (requestUrl.pathname === "/webhook") {
-    if (req.method === "GET") {
-      const verifyToken = requestUrl.searchParams.get("verify_token");
-      const challenge = requestUrl.searchParams.get("challenge") || "OK";
-
-      if (verifyToken === VERIFY_TOKEN) {
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.end(challenge);
-      } else {
-        res.writeHead(403, { "Content-Type": "text/plain" });
-        res.end("Verify token không hợp lệ");
-      }
-
-      return;
-    }
-
-    if (req.method === "POST") {
-      try {
-        const body = await readRequestBody(req);
-
-        if (!body) {
-          res.writeHead(400, { "Content-Type": "text/plain" });
-          res.end("Payload trống");
-          return;
-        }
-
-        await handleWebhookPayload(body);
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.end("received");
-      } catch (error) {
-        console.error("Xử lý webhook thất bại", error);
-        res.writeHead(400, { "Content-Type": "text/plain" });
-        res.end("Payload không hợp lệ");
-      }
-
-      return;
-    }
-
-    res.writeHead(405, { "Content-Type": "text/plain" });
-    res.end("Method không được hỗ trợ");
-    return;
-  }
-
-  res.writeHead(404, { "Content-Type": "text/plain" });
-  res.end("Không tìm thấy tài nguyên");
+app.get("/health", (_req, res) => {
+  res.status(200).type("text/plain").send("OK");
 });
+
+app.get("/webhook", (req, res) => {
+  const verifyToken = req.query.verify_token;
+  const challenge = req.query.challenge || "OK";
+
+  if (verifyToken === VERIFY_TOKEN) {
+    res.status(200).type("text/plain").send(challenge);
+    return;
+  }
+
+  res.status(403).type("text/plain").send("Verify token không hợp lệ");
+});
+
+app.post("/webhook", async (req, res) => {
+  try {
+    const payload = req.body;
+
+    if (
+      payload === null ||
+      payload === undefined ||
+      (typeof payload === "object" && !Array.isArray(payload) && !Object.keys(payload).length)
+    ) {
+      res.status(400).type("text/plain").send("Payload trống");
+      return;
+    }
+
+    await handleWebhookPayload(payload);
+    res.status(200).type("text/plain").send("received");
+  } catch (error) {
+    console.error("Xử lý webhook thất bại", error);
+    res.status(400).type("text/plain").send("Payload không hợp lệ");
+  }
+});
+
+app.all("/webhook", (_req, res) => {
+  res.status(405).type("text/plain").send("Method không được hỗ trợ");
+});
+
+app.use((_req, res) => {
+  res.status(404).type("text/plain").send("Không tìm thấy tài nguyên");
+});
+app.use((err, _req, res, _next) => {
+  if (err && err.type === "entity.parse.failed") {
+    console.error("Payload không phải JSON hợp lệ", err);
+    res.status(400).type("text/plain").send("Payload không hợp lệ");
+    return;
+  }
+
+  console.error("Lỗi không mong muốn", err);
+  res.status(500).type("text/plain").send("Lỗi máy chủ");
+});
+
+let serverInstance;
 
 const startServer = async () => {
   try {
     await initializeDatabase();
-    server.listen(PORT, () => {
+    serverInstance = app.listen(PORT, () => {
       console.log(`Webhook server đang lắng nghe tại cổng ${PORT}`);
+    });
+
+    serverInstance.on("error", (error) => {
+      console.error("Không thể khởi động server", error);
     });
   } catch (error) {
     console.error("Không thể khởi tạo ứng dụng", error);
@@ -80,26 +92,33 @@ const startServer = async () => {
   }
 };
 
-server.on("error", (error) => {
-  console.error("Không thể khởi động server", error);
-});
-
 const shutdown = () => {
   console.log("Đang tắt server...");
 
-  server.close((serverErr) => {
-    if (serverErr) {
-      console.error("Đóng server thất bại", serverErr);
+  const closeServer = new Promise((resolve) => {
+    if (!serverInstance) {
+      resolve();
+      return;
     }
 
-    closeDatabase()
-      .then(() => process.exit(0))
-      .catch((dbErr) => {
-        console.error("Đóng kết nối Turso thất bại", dbErr);
-        process.exit(1);
-      });
+    serverInstance.close((serverErr) => {
+      if (serverErr) {
+        console.error("Đóng server thất bại", serverErr);
+      }
 
+      resolve();
     });
+  });
+
+  closeServer
+    .then(() =>
+      closeDatabase().catch((dbErr) => {
+        console.error("Đóng kết nối Turso thất bại", dbErr);
+        throw dbErr;
+      })
+    )
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
 };
 
 process.on("SIGINT", shutdown);
